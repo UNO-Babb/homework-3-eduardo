@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(15, 30px);
+            grid-template-rows: repeat(15, 30px);
+            gap: 1px;
+            margin: 20px;
+            border: 2px solid black;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: green;
+            border: 1px solid black;
+            position: relative;
+        }
+        .unit {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 20px;
+            height: 20px;
+            background-color: white;
+            border-radius: 50%;
+        }
+        .unit-Heavy-Infantry {
+            border-radius: 0;
+        }
+        .unit-Armor-Car {
+            background-color: brown;
+        }
+        .unit-Armor-Mech {
+            background-color: darkblue;
+        }
+        .unit-Infantry {
+            background-color: blue;
+        }
+        .unit-Ninja {
+            background-color: red;
+        }
+        .flag {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 20px solid yellow;
+            top: 5px;
+            left: 5px;
+        }
+        .unit-selected {
+            border: 2px solid yellow;
+        }
+        .controls {
+            margin: 20px;
+        }
+        .unit-btn, .nation-btn {
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid black;
+            cursor: pointer;
+        }
+        .unit-btn:hover, .nation-btn:hover {
+            background-color: lightgray;
+        }
+        .finish-turn-btn, .restart-btn {
+            padding: 10px 20px;
+            margin-top: 20px;
+            border: 1px solid black;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        .finish-turn-btn:hover, .restart-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Board Game - Select Units, Nation, and Place Flag</h1>
+
+    <!-- Nation Selection Section -->
+    <div class="controls">
+        <h3>Select Your Nation:</h3>
+        <button class="nation-btn" id="Rebel Forces">Rebel Forces (Blue)</button>
+        <button class="nation-btn" id="Naxos">Naxos (Green)</button>
+        <button class="nation-btn" id="Ninja Nation">Ninja Nation (Red)</button>
+        <button class="nation-btn" id="Cyborg Army">Cyborg Army (Brown)</button>
+    </div>
+
+    <!-- Flag Placement Section -->
+    <div class="controls">
+        <h3>Place Your Flag (Click on one of the corners)</h3>
+    </div>
+
+    <!-- Board Section -->
+    <div id="board" class="board"></div>
+
+    <!-- Controls Section for Unit Selection -->
+    <div class="controls">
+        <h3>Select Your Unit:</h3>
+        <button class="unit-btn" id="Infantry">Infantry</button>
+        <button class="unit-btn" id="HeavyInfantry">Heavy Infantry</button>
+        <button class="unit-btn" id="ArmorCar">Armor Car</button>
+        <button class="unit-btn" id="ArmorMech">Armor Mech</button>
+    </div>
+
+    <!-- Finish Turn and Restart Buttons -->
+    <button class="finish-turn-btn" id="finishTurn">Finish Turn</button>
+    <button class="restart-btn" id="restartGame">Restart Game</button>
+
+    <script>
+        const boardSize = 15;
+        const maxUnitsPerPlayer = 5;
+        const maxTotalUnits = 20;
+        const board = document.getElementById("board");
+        const unitButtons = document.querySelectorAll(".unit-btn");
+        const nationButtons = document.querySelectorAll(".nation-btn");
+        const finishTurnButton = document.getElementById("finishTurn");
+        const restartButton = document.getElementById("restartGame");
+
+        let selectedUnit = null;
+        let selectedNation = null;
+        let playerFlagPosition = null;
+        let selectedUnitElement = null;
+        let playerUnitsCount = 0;
+        let totalUnitsCount = 0;
+        let currentPlayer = 1; // 1: Player 1, 2: Player 2
+        let playerFlags = [null, null]; // Track player flags
+        let gameOver = false;
+
+        // Create the game board
+        function createBoard() {
+            for (let i = 0; i < boardSize * boardSize; i++) {
+                const cell = document.createElement("div");
+                cell.className = "cell";
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleCellClick);
+                board.appendChild(cell);
+            }
+
+            // Mark the four corners for flag placement
+            const corners = [
+                {x: 0, y: 0}, // Top-left
+                {x: 0, y: boardSize - 1}, // Top-right
+                {x: boardSize - 1, y: 0}, // Bottom-left
+                {x: boardSize - 1, y: boardSize - 1} // Bottom-right
+            ];
+
+            corners.forEach(corner => {
+                const cornerCell = board.children[corner.x * boardSize + corner.y];
+                cornerCell.addEventListener('click', placeFlagOnCell);
+            });
+        }
+
+        // Flag placement in the corners
+        function placeFlagOnCell(event) {
+            if (playerFlagPosition !== null || gameOver) return; // Only allow one flag per player
+
+            const cell = event.target;
+            playerFlagPosition = parseInt(cell.dataset.index);
+
+            const flagDiv = document.createElement("div");
+            flagDiv.className = "flag";
+            cell.appendChild(flagDiv);
+
+            playerFlags[currentPlayer - 1] = playerFlagPosition;
+
+            alert(`Player ${currentPlayer}'s flag placed at position ${playerFlagPosition}`);
+        }
+
+        // Handle cell click: move or place unit
+        function handleCellClick(event) {
+            if (gameOver) return; // Stop interaction if the game is over
+
+            if (selectedUnit && !selectedUnitElement && playerUnitsCount < maxUnitsPerPlayer && totalUnitsCount < maxTotalUnits) {
+                const cell = event.target;
+                const unitDiv = document.createElement("div");
+                unitDiv.className = `unit unit-${selectedUnit}`;
+                unitDiv.dataset.type = selectedUnit;
+                unitDiv.style.top = "5px";
+                unitDiv.style.left = "5px";
+                unitDiv.addEventListener('click', selectUnit);
+                cell.appendChild(unitDiv);
+
+                playerUnitsCount++;
+                totalUnitsCount++;
+            } else if (selectedUnitElement) {
+                const cell = event.target;
+                const unitDiv = selectedUnitElement;
+
+                if (cell !== unitDiv.parentElement) {
+                    unitDiv.style.top = "5px";
+                    unitDiv.style.left = "5px";
+                    cell.appendChild(unitDiv);
+                    selectedUnitElement = null;
+
+                    // Check for victory: if a unit touches the opponent's flag
+                    if (playerFlags[currentPlayer - 1] && cell.dataset.index == playerFlags[(currentPlayer === 1) ? 1 : 0]) {
+                        alert(`Player ${currentPlayer} wins by capturing the flag!`);
+                        gameOver = true;
+                    }
+                }
+            }
+        }
+
+        // Function to select a unit for movement
+        function selectUnit(event) {
+            if (selectedUnitElement) {
+                selectedUnitElement.classList.remove("unit-selected");
+            }
+            selectedUnitElement = event.target;
+            event.target.classList.add("unit-selected");
+        }
+
+        // Event listeners for unit buttons
+        unitButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                selectedUnit = button.id.replace('HeavyInfantry', 'Heavy-Infantry')
+                                          .replace('ArmorCar', 'Armor-Car')
+                                          .replace('ArmorMech', 'Armor-Mech')
+                                          .replace('Infantry', 'Infantry');
+            });
+        });
+
+        // Event listeners for nation selection
+        nationButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                selectedNation = button.id;
+                alert(`${selectedNation} selected!`);
+            });
+        });
+
+        // Finish turn and switch players
+        finishTurnButton.addEventListener('click', () => {
+            if (playerUnitsCount >= maxUnitsPerPlayer) {
+                currentPlayer = (currentPlayer === 1) ? 2 : 1;
+                alert(`Player ${currentPlayer}'s turn!`);
+                playerUnitsCount = 0;
+            } else {
+                alert("You need to place at least 1 unit before finishing your turn!");
+            }
+        });
+
+        // Restart the game
+        restartButton.addEventListener('click', () => {
+            location.reload(); // Reloads the page to restart the game
+        });
+
+        // Initialize the board
+        createBoard();
+    </script>
+</body>
+</html>
